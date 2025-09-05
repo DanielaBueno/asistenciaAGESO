@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador Avanzado de Asistencia</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .input-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            border-left: 5px solid #667eea;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 200px;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.2s;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .results {
+            background: #e8f5e8;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 25px;
+            border-left: 5px solid #28a745;
+        }
+        .processed-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-size: 10px;
+        }
+        .processed-table th, .processed-table td {
+            padding: 6px;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+        }
+        .processed-table th {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        .processed-table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .late {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .good {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .warning {
+            color: #fd7e14;
+            font-weight: bold;
+        }
+        .overtime {
+            color: #6f42c1;
+            font-weight: bold;
+        }
+        .saturday {
+            background-color: #fff8e1 !important;
+        }
+        .saturday-indicator {
+            background: #ff9800;
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 8px;
+            margin-left: 2px;
+        }
+        .employee-name {
+            text-align: left;
+            font-weight: bold;
+            padding-left: 8px;
+            min-width: 120px;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .summary-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .summary-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .summary-label {
+            color: #666;
+            margin-top: 5px;
+            font-size: 0.8em;
+        }
+        .example-format {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+        }
+        .scroll-container {
+            overflow-x: auto;
+            max-height: 600px;
+        }
+        .parsing-info {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #ffc107;
+        }
+        .day-header {
+            writing-mode: vertical-lr;
+            text-orientation: mixed;
+            min-width: 25px;
+            font-size: 9px;
+        }
+        .info-note {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 3px solid #2196f3;
+            font-size: 12px;
+        }
+        .employee-config {
+            background: #fff3e0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #ff9800;
+        }
+        .employee-config h4 {
+            margin-top: 0;
+            color: #e65100;
+        }
+        .config-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .config-table th, .config-table td {
+            padding: 5px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        .config-table th {
+            background: #ff9800;
+            color: white;
+        }
+        .time-cell {
+            font-size: 9px;
+            line-height: 1.1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Procesador Avanzado de Asistencia</h1>
+        
+        <div class="input-section">
+            <h3>📋 Datos del Excel</h3>
+            
+            <div class="example-format">
+                <strong>✅ Acepta ambos formatos:</strong><br>
+                <strong>Formato 1 (tabla):</strong> Como lo pegas directamente del Excel<br>
+                <strong>Formato 2 (lineal):</strong> ID: 1090412874 Nombre: YURLEY ALEXANDRA...
+            </div>
+
+            <div class="form-group">
+                <label>🔤 Pega aquí los datos del Excel tal como aparecen:</label>
+                <textarea id="rawData" placeholder="Pega aquí directamente lo que copias del Excel (Ctrl+C, Ctrl+V)"></textarea>
+            </div>
+
+            <div class="config-grid">
+                <div class="form-group">
+                    <label>Tolerancia llegadas (min):</label>
+                    <input type="number" id="tolerance" value="10">
+                </div>
+                <div class="form-group">
+                    <label>Almuerzo por defecto (min):</label>
+                    <input type="number" id="defaultLunch" value="60">
+                </div>
+            </div>
+
+            <button class="btn" onclick="processRawData()">🚀 Procesar Datos</button>
+            <button class="btn btn-secondary" onclick="loadExampleData()">📝 Cargar Ejemplo</button>
+        </div>
+
+        <div class="employee-config" id="employeeConfig" style="display: none;">
+            <h4>👥 Configuración Individual de Empleados</h4>
+            <p>Ajusta los horarios específicos para cada empleado:</p>
+            <div id="employeeConfigTable"></div>
+            <button class="btn" onclick="recalculateWithConfig()">🔄 Recalcular con Configuración</button>
+        </div>
+
+        <div class="parsing-info" id="parsingInfo" style="display: none;">
+            <h4>🔍 Análisis de Datos:</h4>
+            <div id="parsingDetails"></div>
+        </div>
+
+        <div class="results" id="resultsSection" style="display: none;">
+            <h3>📊 Resultados de Asistencia</h3>
+            <div class="summary" id="summary"></div>
+            
+            <div class="scroll-container">
+                <table class="processed-table" id="processedTable">
+                    <thead id="tableHead"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            
+            <button class="btn" onclick="exportToCSV()">📥 Descargar Resultados</button>
+        </div>
+    </div>
+
+    <script>
+        let processedEmployees = [];
+        let employeeConfigs = {};
+
+        function extractTimes(text) {
+            const timeRegex = /\d{2}:\d{2}/g;
+            const matches = text.match(timeRegex) || [];
+            return matches;
+        }
+
+        function cleanEmployeeName(nameStr) {
+            // Eliminar múltiples espacios y tabs
+            let cleaned = nameStr.replace(/\s+/g, ' ').trim();
+            
+            // Remover caracteres especiales al inicio y final
+            cleaned = cleaned.replace(/^[^\w\s]+|[^\w\s]+$/g, '');
+            
+            // Capitalizar correctamente
+            cleaned = cleaned.split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
+            
+            return cleaned || 'Sin nombre';
+        }
+
+        function parseTableFormat(rawData) {
+            const employees = [];
+            const lines = rawData.split('\n').filter(line => line.trim());
+            
+            let currentEmployee = null;
+            
+            for (let line of lines) {
+                // Buscar línea con ID y Nombre
+                if (line.includes('ID:') && line.includes('Nombre:')) {
+                    if (currentEmployee) {
+                        employees.push(currentEmployee);
+                    }
+                    
+                    const idMatch = line.match(/ID:\s*(\d+)/);
+                    
+                    // Mejorar la extracción del nombre
+                    let nameMatch = line.match(/Nombre:\s*([^D]+?)(?:\s*Departamento:|$)/);
+                    let name = 'Sin nombre';
+                    
+                    if (nameMatch) {
+                        name = cleanEmployeeName(nameMatch[1]);
+                    }
+                    
+                    const deptMatch = line.match(/Departamento:\s*(.+?)$/);
+                    
+                    currentEmployee = {
+                        id: idMatch ? idMatch[1].trim() : '',
+                        name: name,
+                        department: deptMatch ? deptMatch[1].trim() : '',
+                        allTimes: []
+                    };
+                } else if (currentEmployee && line.trim()) {
+                    // Extraer horarios de las líneas siguientes
+                    const times = extractTimes(line);
+                    currentEmployee.allTimes.push(...times);
+                }
+            }
+            
+            if (currentEmployee) {
+                employees.push(currentEmployee);
+            }
+            
+            return employees;
+        }
+
+        function parseLinearFormat(rawData) {
+            const lines = rawData.split(/\n+/).filter(line => line.trim() && line.includes('ID:'));
+            const employees = [];
+            
+            lines.forEach(line => {
+                const idMatch = line.match(/ID:\s*(\d+)/);
+                
+                // Mejorar la extracción del nombre
+                let nameMatch = line.match(/Nombre:\s*([A-Z\s]+?)(?:\s+Departamento|\s+\d{2}:)/);
+                let name = 'Sin nombre';
+                
+                if (nameMatch) {
+                    name = cleanEmployeeName(nameMatch[1]);
+                }
+                
+                const deptMatch = line.match(/Departamento:\s*([^\d]+)/);
+                
+                const afterDept = line.split(/Departamento.*?/)[1] || line.split(/Empresa/)[1] || '';
+                const allTimes = extractTimes(afterDept);
+                
+                employees.push({
+                    id: idMatch ? idMatch[1] : '',
+                    name: name,
+                    department: deptMatch ? deptMatch[1].trim() : '',
+                    allTimes: allTimes
+                });
+            });
+            
+            return employees;
+        }
+
+        function isSaturday(times) {
+            if (times.length === 0) return false;
+            
+            const sorted = times.sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
+            const lastTime = sorted[sorted.length - 1];
+            const lastHour = parseInt(lastTime.split(':')[0]);
+            
+            return lastHour < 14 || (times.length <= 2 && lastHour <= 15);
+        }
+
+        function groupTimesByDay(times) {
+            const days = [];
+            let currentDay = [];
+            
+            for (let i = 0; i < times.length; i++) {
+                const time = times[i];
+                const hour = parseInt(time.split(':')[0]);
+                
+                if (hour <= 8 && currentDay.length > 0) {
+                    const lastTime = currentDay[currentDay.length - 1];
+                    const lastHour = parseInt(lastTime.split(':')[0]);
+                    
+                    if (lastHour >= 12 || currentDay.length >= 4 || isSaturday(currentDay)) {
+                        days.push([...currentDay]);
+                        currentDay = [time];
+                    } else {
+                        currentDay.push(time);
+                    }
+                } else {
+                    currentDay.push(time);
+                }
+            }
+            
+            if (currentDay.length > 0) {
+                days.push(currentDay);
+            }
+
+            return days;
+        }
+
+        function organizeDayTimes(times) {
+            if (times.length === 0) return null;
+
+            const isSat = isSaturday(times);
+            const sorted = times.sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
+
+            let organized = {
+                entry: null,
+                lunchStart: null,
+                lunchEnd: null,
+                afternoonEntry: null,
+                exit: null,
+                allTimes: sorted,
+                isSaturday: isSat
+            };
+
+            if (sorted.length >= 1) {
+                organized.entry = sorted[0];
+                organized.exit = sorted[sorted.length - 1];
+
+                if (!isSat && sorted.length >= 3) {
+                    const middleTimes = sorted.slice(1, -1);
+                    const lunchTimes = middleTimes.filter(time => {
+                        const hour = parseInt(time.split(':')[0]);
+                        return hour >= 10 && hour <= 15;
+                    });
+
+                    if (lunchTimes.length >= 2) {
+                        organized.lunchStart = lunchTimes[0];
+                        organized.lunchEnd = lunchTimes[lunchTimes.length - 1];
+                        organized.afternoonEntry = organized.lunchEnd;
+                    }
+                }
+            }
+
+            return organized;
+        }
+
+        function timeToMinutes(timeStr) {
+            if (!timeStr) return null;
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
+        }
+
+        function minutesToTimeString(minutes) {
+            if (minutes === null || minutes === undefined || minutes < 0) return '--';
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            return `${hours}:${mins.toString().padStart(2, '0')}`;
+        }
+
+        function getEmployeeConfig(employeeId) {
+            if (employeeConfigs[employeeId]) {
+                return employeeConfigs[employeeId];
+            }
+            
+            // Configuración por defecto
+            return {
+                weekdayEntry: '06:00',
+                weekdayExit: '17:30',
+                saturdayEntry: '06:00',
+                saturdayExit: '12:00',
+                afternoonEntry: '14:00',
+                lunchDuration: parseInt(document.getElementById('defaultLunch').value),
+                saturdayLunch: 0
+            };
+        }
+
+        function calculateDayStats(dayData, employeeId) {
+            if (!dayData || !dayData.entry || !dayData.exit) {
+                return {
+                    hoursWorked: 0,
+                    lateMinutes: 0,
+                    earlyExitMinutes: 0,
+                    overtimeMinutes: 0,
+                    status: 'sin_datos'
+                };
+            }
+
+            const config = getEmployeeConfig(employeeId);
+            const tolerance = parseInt(document.getElementById('tolerance').value);
+            
+            const expectedEntry = dayData.isSaturday ? config.saturdayEntry : config.weekdayEntry;
+            const expectedExit = dayData.isSaturday ? config.saturdayExit : config.weekdayExit;
+            const lunchDuration = dayData.isSaturday ? config.saturdayLunch : config.lunchDuration;
+
+            const entryMin = timeToMinutes(dayData.entry);
+            const exitMin = timeToMinutes(dayData.exit);
+            const expectedEntryMin = timeToMinutes(expectedEntry);
+            const expectedExitMin = timeToMinutes(expectedExit);
+
+            // Calcular tardanza
+            const lateMinutes = Math.max(0, entryMin - expectedEntryMin - tolerance);
+
+            // Calcular salida temprana
+            const earlyExitMinutes = Math.max(0, expectedExitMin - exitMin - tolerance);
+
+            // Calcular horas extras
+            const overtimeMinutes = Math.max(0, exitMin - expectedExitMin - tolerance);
+
+            // Calcular horas trabajadas
+            let totalMinutes = exitMin - entryMin;
+            
+            if (dayData.lunchStart && dayData.lunchEnd) {
+                const actualLunch = timeToMinutes(dayData.lunchEnd) - timeToMinutes(dayData.lunchStart);
+                totalMinutes -= actualLunch;
+            } else if (lunchDuration > 0) {
+                totalMinutes -= lunchDuration;
+            }
+
+            const hoursWorked = Math.max(0, totalMinutes);
+
+            // Determinar estado
+            let status = 'puntual';
+            if (lateMinutes > 0 && overtimeMinutes > 0) {
+                status = 'tarde_extra';
+            } else if (lateMinutes > 0 && earlyExitMinutes > 0) {
+                status = 'tarde_temprano';
+            } else if (lateMinutes > 0) {
+                status = 'tarde';
+            } else if (earlyExitMinutes > 0) {
+                status = 'temprano';
+            } else if (overtimeMinutes > 0) {
+                status = 'extra';
+            }
+
+            return {
+                hoursWorked: hoursWorked,
+                lateMinutes: lateMinutes,
+                earlyExitMinutes: earlyExitMinutes,
+                overtimeMinutes: overtimeMinutes,
+                status: status
+            };
+        }
+
+        function processRawData() {
+            const rawData = document.getElementById('rawData').value.trim();
+
+            if (!rawData) {
+                alert('Por favor pega los datos del Excel');
+                return;
+            }
+
+            let employees = [];
+            
+            // Detectar formato
+            if (rawData.includes('ID:') && rawData.includes('Nombre:') && rawData.includes('Departamento:')) {
+                if (rawData.split('\n').some(line => line.includes('ID:') && line.includes('Nombre:') && line.includes('Departamento:'))) {
+                    employees = parseTableFormat(rawData);
+                } else {
+                    employees = parseLinearFormat(rawData);
+                }
+            } else {
+                alert('Formato no reconocido. Asegúrate de incluir ID:, Nombre: y Departamento:');
+                return;
+            }
+
+            processedEmployees = [];
+            let parsingDetails = '<ul>';
+            let totalSaturdays = 0;
+
+            employees.forEach((employeeData) => {
+                parsingDetails += `<li><strong>${employeeData.name}</strong> (${employeeData.department}) - ${employeeData.allTimes.length} registros</li>`;
+                
+                if (employeeData.allTimes.length > 0) {
+                    const dayGroups = groupTimesByDay(employeeData.allTimes);
+                    
+                    let employee = {
+                        id: employeeData.id,
+                        name: employeeData.name,
+                        department: employeeData.department,
+                        days: []
+                    };
+
+                    dayGroups.forEach((dayTimes, dayIndex) => {
+                        const organized = organizeDayTimes(dayTimes);
+                        if (organized) {
+                            const stats = calculateDayStats(organized, employeeData.id);
+                            employee.days.push({
+                                dayNumber: dayIndex + 1,
+                                organized: organized,
+                                stats: stats
+                            });
+                            
+                            if (organized.isSaturday) {
+                                totalSaturdays++;
+                            }
+                        }
+                    });
+
+                    processedEmployees.push(employee);
+                }
+            });
+
+            parsingDetails += `</ul><div class="info-note">📊 <strong>${totalSaturdays}</strong> días detectados como sábados</div>`;
+            document.getElementById('parsingDetails').innerHTML = parsingDetails;
+            document.getElementById('parsingInfo').style.display = 'block';
+
+            createEmployeeConfig();
+            displayResults();
+        }
+
+        function createEmployeeConfig() {
+            let configHTML = '<table class="config-table"><tr><th>Empleado</th><th>Entrada L-V</th><th>Salida L-V</th><th>Entrada Tarde</th><th>Entrada Sáb</th><th>Salida Sáb</th><th>Almuerzo (min)</th></tr>';
+            
+            processedEmployees.forEach(employee => {
+                const config = getEmployeeConfig(employee.id);
+                configHTML += `
+                    <tr>
+                        <td>${employee.name}</td>
+                        <td><input type="time" id="entry_${employee.id}" value="${config.weekdayEntry}" style="width:80px;font-size:10px;"></td>
+                        <td><input type="time" id="exit_${employee.id}" value="${config.weekdayExit}" style="width:80px;font-size:10px;"></td>
+                        <td><input type="time" id="afternoon_${employee.id}" value="${config.afternoonEntry}" style="width:80px;font-size:10px;"></td>
+                        <td><input type="time" id="sat_entry_${employee.id}" value="${config.saturdayEntry}" style="width:80px;font-size:10px;"></td>
+                        <td><input type="time" id="sat_exit_${employee.id}" value="${config.saturdayExit}" style="width:80px;font-size:10px;"></td>
+                        <td><input type="number" id="lunch_${employee.id}" value="${config.lunchDuration}" style="width:60px;font-size:10px;"></td>
+                    </tr>
+                `;
+            });
+            
+            configHTML += '</table>';
+            document.getElementById('employeeConfigTable').innerHTML = configHTML;
+            document.getElementById('employeeConfig').style.display = 'block';
+        }
+
+        function recalculateWithConfig() {
+            // Actualizar configuraciones
+            processedEmployees.forEach(employee => {
+                employeeConfigs[employee.id] = {
+                    weekdayEntry: document.getElementById(`entry_${employee.id}`).value,
+                    weekdayExit: document.getElementById(`exit_${employee.id}`).value,
+                    afternoonEntry: document.getElementById(`afternoon_${employee.id}`).value,
+                    saturdayEntry: document.getElementById(`sat_entry_${employee.id}`).value,
+                    saturdayExit: document.getElementById(`sat_exit_${employee.id}`).value,
+                    lunchDuration: parseInt(document.getElementById(`lunch_${employee.id}`).value),
+                    saturdayLunch: 0
+                };
+            });
+
+            // Recalcular estadísticas
+            processedEmployees.forEach(employee => {
+                employee.days.forEach(day => {
+                    day.stats = calculateDayStats(day.organized, employee.id);
+                });
+            });
+
+            displayResults();
+        }
+
+        function displayResults() {
+            if (processedEmployees.length === 0) {
+                alert('No se pudieron procesar los datos.');
+                return;
+            }
+
+            const maxDays = Math.max(...processedEmployees.map(emp => emp.days.length));
+
+            const tableHead = document.getElementById('tableHead');
+            let headerHTML = '<tr><th class="employee-name">Empleado</th>';
+            for (let day = 1; day <= maxDays; day++) {
+                headerHTML += `<th class="day-header">D${day}</th>`;
+            }
+            headerHTML += '<th>Total H</th><th>Tardanzas</th><th>H. Extra</th></tr>';
+            tableHead.innerHTML = headerHTML;
+
+            const tableBody = document.getElementById('tableBody');
+            let bodyHTML = '';
+
+            let totalHours = 0;
+            let totalLateDays = 0;
+            let totalOvertimeDays = 0;
+            let totalDays = 0;
+            let totalSaturdays = 0;
+
+            processedEmployees.forEach(employee => {
+                bodyHTML += `<tr><td class="employee-name">${employee.name}<br><small>${employee.department}</small></td>`;
+                
+                let employeeTotalHours = 0;
+                let employeeTotalLate = 0;
+                let employeeTotalOvertime = 0;
+                let employeeSaturdays = 0;
+
+                for (let dayIndex = 0; dayIndex < maxDays; dayIndex++) {
+                    const dayData = employee.days[dayIndex];
+                    
+                    if (dayData) {
+                        const stats = dayData.stats;
+                        const org = dayData.organized;
+                        
+                        employeeTotalHours += stats.hoursWorked;
+                        if (stats.lateMinutes > 0) employeeTotalLate++;
+                        if (stats.overtimeMinutes > 0) employeeTotalOvertime++;
+                        if (org.isSaturday) employeeSaturdays++;
+                        
+                        let statusClass = '';
+                        let statusIcon = '';
+                        
+                        switch (stats.status) {
+                            case 'puntual':
+                                statusClass = 'good';
+                                statusIcon = '✅';
+                                break;
+                            case 'tarde':
+                                statusClass = 'late';
+                                statusIcon = '🔴';
+                                totalLateDays++;
+                                break;
+                            case 'extra':
+                                statusClass = 'overtime';
+                                statusIcon = '🟣';
+                                totalOvertimeDays++;
+                                break;
+                            case 'tarde_extra':
+                                statusClass = 'late';
+                                statusIcon = '⚠️';
+                                totalLateDays++;
+                                totalOvertimeDays++;
+                                break;
+                            case 'temprano':
+                                statusClass = 'warning';
+                                statusIcon = '🟡';
+                                break;
+                        }
+
+                        let cellContent = `
+                            <div class="time-cell">
+                                <div><strong>${org.entry}</strong>→<strong>${org.exit}</strong></div>
+                        `;
+                        
+                        // Mostrar horario de tarde si existe
+                        if (org.afternoonEntry && org.afternoonEntry !== org.lunchEnd) {
+                            cellContent += `<div><small>Tarde: ${org.afternoonEntry}</small></div>`;
+                        }
+                        
+                        cellContent += `
+                                <div class="${statusClass}">${minutesToTimeString(stats.hoursWorked)} ${statusIcon}</div>
+                                ${stats.lateMinutes > 0 ? `<div class="late">+${stats.lateMinutes}m</div>` : ''}
+                                ${stats.overtimeMinutes > 0 ? `<div class="overtime">E+${stats.overtimeMinutes}m</div>` : ''}
+                                ${org.isSaturday ? '<span class="saturday-indicator">S</span>' : ''}
+                            </div>
+                        `;
+                        
+                        const cellClass = org.isSaturday ? 'saturday' : '';
+                        bodyHTML += `<td class="${cellClass}">${cellContent}</td>`;
+                        totalDays++;
+                    } else {
+                        bodyHTML += '<td style="background: #f0f0f0;">--</td>';
+                    }
+                }
+
+                totalHours += employeeTotalHours;
+                totalSaturdays += employeeSaturdays;
+                
+                bodyHTML += `<td class="hours-worked"><strong>${minutesToTimeString(employeeTotalHours)}</strong></td>`;
+                bodyHTML += `<td class="${employeeTotalLate > 0 ? 'late' : 'good'}">${employeeTotalLate}</td>`;
+                bodyHTML += `<td class="${employeeTotalOvertime > 0 ? 'overtime' : 'good'}">${employeeTotalOvertime}</td>`;
+                bodyHTML += '</tr>';
+            });
+
+            tableBody.innerHTML = bodyHTML;
+
+            document.getElementById('summary').innerHTML = `
+                <div class="summary-card">
+                    <div class="summary-value">${processedEmployees.length}</div>
+                    <div class="summary-label">Empleados</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-value">${totalDays}</div>
+                    <div class="summary-label">Días Procesados</div>
+                </div>
+                <div class="summary-card" style="background: #fff8e1;">
+                    <div class="summary-value" style="color: #ff9800;">${totalSaturdays}</div>
+                    <div class="summary-label">Sábados</div>
+                </div>
+                <div class="summary-card" style="background: #ffebee;">
+                    <div class="summary-value" style="color: #dc3545;">${totalLateDays}</div>
+                    <div class="summary-label">Tardanzas</div>
+                </div>
+                <div class="summary-card" style="background: #f3e5f5;">
+                    <div class="summary-value" style="color: #6f42c1;">${totalOvertimeDays}</div>
+                    <div class="summary-label">Horas Extra</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-value">${minutesToTimeString(totalHours)}</div>
+                    <div class="summary-label">Total Horas</div>
+                </div>
+            `;
+
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        function loadExampleData() {
+            const example = `ID:		1090412874						Nombre:		YURLEY ALEXANDRA								Departamento:		Empresa										
+05:5310:3213:5918:31	05:5011:4213:5614:59	05:5310:5313:5618:37	05:5510:5713:5817:33	05:5312:09		05:5010:4310:49	05:5910:5114:0118:27	05:5711:0313:5818:05	05:5610:4813:5718:15	05:5210:3313:5717:26	05:5312:07		05:5210:3813:5917:39	05:5110:3113:5818:01	10:2413:5917:18	05:5310:2114:0117:17	05:5210:3813:5917:20	05:5412:01		05:5310:4217:22	05:5610:2013:5817:41	10:2414:0017:23	05:5410:2414:0017:17	05:5510:2513:5517:26	05:4711:57		05:5510:2113:5917:27	05:5510:2314:0317:52	06:0410:2414:0317:54	05:5310:4310:4413:5817:59
+ID:		13451767						Nombre:		GERMAN ENRIQUE								Departamento:		Empresa										
+						06:3811:4814:1617:55	06:3411:3314:1217:32	06:4011:5914:1017:41	06:4211:4214:0717:30	06:4111:2714:3017:41	06:5310:31		06:3911:5314:1217:40	06:2911:3014:1517:22	06:3211:2914:1717:31	06:4011:3514:1217:28	06:4111:2914:1717:20	06:5910:48		06:4411:4314:1117:24	06:4811:4514:1817:21	06:3211:3614:0417:23	06:3411:3614:1217:20	06:4211:3414:1917:24	06:4210:34		06:3911:2914:1317:30	06:4211:5514:1717:39	06:3411:5211:5814:3317:40	06:3711:4414:1917:37`;
+            
+            document.getElementById('rawData').value = example;
+        }
+
+        function exportToCSV() {
+            if (processedEmployees.length === 0) return;
+            
+            let csv = 'Empleado,ID,Departamento,Dia,Tipo_Dia,Entrada,Salida,Entrada_Tarde,Horas_Trabajadas,Minutos_Tardanza,Minutos_Extras,Estado,Almuerzo_Inicio,Almuerzo_Fin\n';
+
+            processedEmployees.forEach(employee => {
+                employee.days.forEach(day => {
+                    const org = day.organized;
+                    const stats = day.stats;
+                    const dayType = org.isSaturday ? 'Sábado' : 'Laboral';
+                    
+                    csv += `"${employee.name}","${employee.id}","${employee.department}",${day.dayNumber},"${dayType}",`;
+                    csv += `"${org.entry || ''}","${org.exit || ''}","${org.afternoonEntry || ''}",`;
+                    csv += `"${minutesToTimeString(stats.hoursWorked)}",${stats.lateMinutes},${stats.overtimeMinutes},"${stats.status}",`;
+                    csv += `"${org.lunchStart || ''}","${org.lunchEnd || ''}"\n`;
+                });
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'asistencia_completa.csv');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>
