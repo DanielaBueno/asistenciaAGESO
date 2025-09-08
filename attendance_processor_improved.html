@@ -592,7 +592,20 @@
             const expectedEntryMin = timeToMinutes(expectedEntry);
             const expectedExitMin = timeToMinutes(expectedExit);
 
-            const lateMinutes = Math.max(0, entryMin - expectedEntryMin - tolerance);
+            // Tardanza mañana
+            let lateMorning = Math.max(0, entryMin - expectedEntryMin - tolerance);
+
+            // Tardanza tarde (si aplica)
+            let lateAfternoon = 0;
+            if (dayData.afternoonEntry && config.worksAfternoon && !dayData.isSaturday) {
+                const expectedAfternoonMin = timeToMinutes(config.afternoonEntry);
+                const afternoonEntryMin = timeToMinutes(dayData.afternoonEntry);
+                lateAfternoon = Math.max(0, afternoonEntryMin - expectedAfternoonMin - tolerance);
+            }
+
+            // Tardanza total = mañana + tarde
+            const lateMinutes = lateMorning + lateAfternoon;
+
             const earlyExitMinutes = Math.max(0, expectedExitMin - exitMin - tolerance);
             const overtimeMinutes = Math.max(0, exitMin - expectedExitMin - tolerance);
 
@@ -1021,7 +1034,7 @@ ID:		13451767						Nombre:		GERMAN ENRIQUE								Departamento:		Empresa
                     
                     if (day.isSunday) {
                         csv += `"${employee.id}","${employee.name}","${employee.department}",${day.dayNumber},"${dayType}",`;
-                        csv += '"","","","","","","","","domingo","","","",""' + '\n';
+                        csv += '"","","","","","","","","","domingo","","","",""' + '\n';
                     } else {
                         const org = day.organized;
                         const stats = day.stats;
