@@ -135,11 +135,26 @@
             color: #6f42c1;
             font-weight: bold;
         }
+        .incomplete {
+            color: #e91e63;
+            font-weight: bold;
+        }
         .saturday {
             background-color: #fff8e1 !important;
         }
+        .sunday {
+            background-color: #e8f5e8 !important;
+        }
         .saturday-indicator {
             background: #ff9800;
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 8px;
+            margin-left: 2px;
+        }
+        .sunday-indicator {
+            background: #4caf50;
             color: white;
             padding: 2px 4px;
             border-radius: 3px;
@@ -221,7 +236,7 @@
         .config-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 12px;
+            font-size: 11px;
         }
         .config-table th, .config-table td {
             padding: 5px;
@@ -231,10 +246,20 @@
         .config-table th {
             background: #ff9800;
             color: white;
+            font-size: 10px;
         }
         .time-cell {
             font-size: 9px;
             line-height: 1.1;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .checkbox-container input[type="checkbox"] {
+            width: auto;
+            margin: 0;
         }
     </style>
 </head>
@@ -294,7 +319,10 @@
                 </table>
             </div>
             
-            <button class="btn" onclick="exportToCSV()">📥 Descargar Resultados</button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+                <button class="btn" onclick="exportToCSV()">📥 Descargar Resumen CSV</button>
+                <button class="btn" onclick="exportDetailedReport()">📋 Descargar Informe Completo</button>
+            </div>
         </div>
     </div>
 
@@ -309,17 +337,11 @@
         }
 
         function cleanEmployeeName(nameStr) {
-            // Eliminar múltiples espacios y tabs
             let cleaned = nameStr.replace(/\s+/g, ' ').trim();
-            
-            // Remover caracteres especiales al inicio y final
             cleaned = cleaned.replace(/^[^\w\s]+|[^\w\s]+$/g, '');
-            
-            // Capitalizar correctamente
             cleaned = cleaned.split(' ')
                 .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                 .join(' ');
-            
             return cleaned || 'Sin nombre';
         }
 
@@ -330,15 +352,12 @@
             let currentEmployee = null;
             
             for (let line of lines) {
-                // Buscar línea con ID y Nombre
                 if (line.includes('ID:') && line.includes('Nombre:')) {
                     if (currentEmployee) {
                         employees.push(currentEmployee);
                     }
                     
                     const idMatch = line.match(/ID:\s*(\d+)/);
-                    
-                    // Mejorar la extracción del nombre
                     let nameMatch = line.match(/Nombre:\s*([^D]+?)(?:\s*Departamento:|$)/);
                     let name = 'Sin nombre';
                     
@@ -355,7 +374,6 @@
                         allTimes: []
                     };
                 } else if (currentEmployee && line.trim()) {
-                    // Extraer horarios de las líneas siguientes
                     const times = extractTimes(line);
                     currentEmployee.allTimes.push(...times);
                 }
@@ -374,8 +392,6 @@
             
             lines.forEach(line => {
                 const idMatch = line.match(/ID:\s*(\d+)/);
-                
-                // Mejorar la extracción del nombre
                 let nameMatch = line.match(/Nombre:\s*([A-Z\s]+?)(?:\s+Departamento|\s+\d{2}:)/);
                 let name = 'Sin nombre';
                 
@@ -384,7 +400,6 @@
                 }
                 
                 const deptMatch = line.match(/Departamento:\s*([^\d]+)/);
-                
                 const afterDept = line.split(/Departamento.*?/)[1] || line.split(/Empresa/)[1] || '';
                 const allTimes = extractTimes(afterDept);
                 
@@ -401,11 +416,9 @@
 
         function isSaturday(times) {
             if (times.length === 0) return false;
-            
             const sorted = times.sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
             const lastTime = sorted[sorted.length - 1];
             const lastHour = parseInt(lastTime.split(':')[0]);
-            
             return lastHour < 14 || (times.length <= 2 && lastHour <= 15);
         }
 
@@ -452,7 +465,9 @@
                 afternoonEntry: null,
                 exit: null,
                 allTimes: sorted,
-                isSaturday: isSat
+                isSaturday: isSat,
+                isIncomplete: false,
+                missingRecords: []
             };
 
             if (sorted.length >= 1) {
@@ -471,6 +486,29 @@
                         organized.lunchEnd = lunchTimes[lunchTimes.length - 1];
                         organized.afternoonEntry = organized.lunchEnd;
                     }
+                }
+            }
+
+            // Detectar registros incompletos
+            if (!isSat) {
+                if (sorted.length === 1) {
+                    organized.isIncomplete = true;
+                    organized.missingRecords.push('salida');
+                } else if (sorted.length === 2) {
+                    // Podría estar incompleto si trabaja tarde
+                    const config = getEmployeeConfig('default');
+                    if (config.worksAfternoon) {
+                        organized.isIncomplete = true;
+                        organized.missingRecords.push('entrada tarde', 'salida tarde');
+                    }
+                } else if (sorted.length === 3) {
+                    organized.isIncomplete = true;
+                    organized.missingRecords.push('entrada o salida tarde');
+                }
+            } else {
+                if (sorted.length === 1) {
+                    organized.isIncomplete = true;
+                    organized.missingRecords.push('salida');
                 }
             }
 
@@ -495,51 +533,69 @@
                 return employeeConfigs[employeeId];
             }
             
-            // Configuración por defecto
             return {
-                weekdayEntry: '06:00',
-                weekdayExit: '17:30',
+                morningEntry: '06:00',
+                morningExit: '12:00',
+                afternoonEntry: '14:00',
+                afternoonExit: '17:30',
                 saturdayEntry: '06:00',
                 saturdayExit: '12:00',
-                afternoonEntry: '14:00',
+                worksAfternoon: true,
                 lunchDuration: parseInt(document.getElementById('defaultLunch').value),
                 saturdayLunch: 0
             };
         }
 
         function calculateDayStats(dayData, employeeId) {
-            if (!dayData || !dayData.entry || !dayData.exit) {
+            if (!dayData) {
                 return {
                     hoursWorked: 0,
                     lateMinutes: 0,
                     earlyExitMinutes: 0,
                     overtimeMinutes: 0,
-                    status: 'sin_datos'
+                    status: 'domingo'
+                };
+            }
+
+            if (!dayData.entry || !dayData.exit) {
+                return {
+                    hoursWorked: 0,
+                    lateMinutes: 0,
+                    earlyExitMinutes: 0,
+                    overtimeMinutes: 0,
+                    status: 'incompleto'
                 };
             }
 
             const config = getEmployeeConfig(employeeId);
             const tolerance = parseInt(document.getElementById('tolerance').value);
             
-            const expectedEntry = dayData.isSaturday ? config.saturdayEntry : config.weekdayEntry;
-            const expectedExit = dayData.isSaturday ? config.saturdayExit : config.weekdayExit;
-            const lunchDuration = dayData.isSaturday ? config.saturdayLunch : config.lunchDuration;
+            let expectedEntry, expectedExit;
+            
+            if (dayData.isSaturday) {
+                expectedEntry = config.saturdayEntry;
+                expectedExit = config.saturdayExit;
+            } else {
+                expectedEntry = config.morningEntry;
+                if (config.worksAfternoon) {
+                    expectedExit = config.afternoonExit;
+                } else {
+                    expectedExit = config.morningExit;
+                }
+            }
+
+            const lunchDuration = dayData.isSaturday ? config.saturdayLunch : 
+                                (config.worksAfternoon ? config.lunchDuration : 0);
 
             const entryMin = timeToMinutes(dayData.entry);
             const exitMin = timeToMinutes(dayData.exit);
             const expectedEntryMin = timeToMinutes(expectedEntry);
             const expectedExitMin = timeToMinutes(expectedExit);
 
-            // Calcular tardanza
             const lateMinutes = Math.max(0, entryMin - expectedEntryMin - tolerance);
-
-            // Calcular salida temprana
             const earlyExitMinutes = Math.max(0, expectedExitMin - exitMin - tolerance);
-
-            // Calcular horas extras
             const overtimeMinutes = Math.max(0, exitMin - expectedExitMin - tolerance);
 
-            // Calcular horas trabajadas
             let totalMinutes = exitMin - entryMin;
             
             if (dayData.lunchStart && dayData.lunchEnd) {
@@ -551,9 +607,10 @@
 
             const hoursWorked = Math.max(0, totalMinutes);
 
-            // Determinar estado
             let status = 'puntual';
-            if (lateMinutes > 0 && overtimeMinutes > 0) {
+            if (dayData.isIncomplete) {
+                status = 'incompleto';
+            } else if (lateMinutes > 0 && overtimeMinutes > 0) {
                 status = 'tarde_extra';
             } else if (lateMinutes > 0 && earlyExitMinutes > 0) {
                 status = 'tarde_temprano';
@@ -584,7 +641,6 @@
 
             let employees = [];
             
-            // Detectar formato
             if (rawData.includes('ID:') && rawData.includes('Nombre:') && rawData.includes('Departamento:')) {
                 if (rawData.split('\n').some(line => line.includes('ID:') && line.includes('Nombre:') && line.includes('Departamento:'))) {
                     employees = parseTableFormat(rawData);
@@ -599,20 +655,29 @@
             processedEmployees = [];
             let parsingDetails = '<ul>';
             let totalSaturdays = 0;
+            let totalSundays = 0;
+            let totalIncomplete = 0;
+
+            // Encontrar el número máximo de días trabajados
+            const maxDays = Math.max(...employees.map(emp => {
+                if (emp.allTimes.length === 0) return 0;
+                return groupTimesByDay(emp.allTimes).length;
+            }));
 
             employees.forEach((employeeData) => {
                 parsingDetails += `<li><strong>${employeeData.name}</strong> (${employeeData.department}) - ${employeeData.allTimes.length} registros</li>`;
                 
+                let employee = {
+                    id: employeeData.id,
+                    name: employeeData.name,
+                    department: employeeData.department,
+                    days: []
+                };
+
                 if (employeeData.allTimes.length > 0) {
                     const dayGroups = groupTimesByDay(employeeData.allTimes);
                     
-                    let employee = {
-                        id: employeeData.id,
-                        name: employeeData.name,
-                        department: employeeData.department,
-                        days: []
-                    };
-
+                    // Procesar días trabajados
                     dayGroups.forEach((dayTimes, dayIndex) => {
                         const organized = organizeDayTimes(dayTimes);
                         if (organized) {
@@ -620,20 +685,49 @@
                             employee.days.push({
                                 dayNumber: dayIndex + 1,
                                 organized: organized,
-                                stats: stats
+                                stats: stats,
+                                isSunday: false
                             });
                             
-                            if (organized.isSaturday) {
-                                totalSaturdays++;
-                            }
+                            if (organized.isSaturday) totalSaturdays++;
+                            if (organized.isIncomplete) totalIncomplete++;
                         }
                     });
 
-                    processedEmployees.push(employee);
+                    // Agregar domingos para completar hasta maxDays
+                    while (employee.days.length < maxDays) {
+                        const dayNumber = employee.days.length + 1;
+                        const stats = calculateDayStats(null, employeeData.id);
+                        employee.days.push({
+                            dayNumber: dayNumber,
+                            organized: null,
+                            stats: stats,
+                            isSunday: true
+                        });
+                        totalSundays++;
+                    }
+                } else {
+                    // Si no tiene registros, todos son domingos
+                    for (let i = 1; i <= maxDays; i++) {
+                        const stats = calculateDayStats(null, employeeData.id);
+                        employee.days.push({
+                            dayNumber: i,
+                            organized: null,
+                            stats: stats,
+                            isSunday: true
+                        });
+                        totalSundays++;
+                    }
                 }
+
+                processedEmployees.push(employee);
             });
 
-            parsingDetails += `</ul><div class="info-note">📊 <strong>${totalSaturdays}</strong> días detectados como sábados</div>`;
+            parsingDetails += `</ul>
+                <div class="info-note">📊 <strong>${totalSaturdays}</strong> días detectados como sábados</div>
+                <div class="info-note">🏠 <strong>${totalSundays}</strong> días detectados como domingos</div>
+                <div class="info-note">⚠️ <strong>${totalIncomplete}</strong> días con registros incompletos</div>`;
+            
             document.getElementById('parsingDetails').innerHTML = parsingDetails;
             document.getElementById('parsingInfo').style.display = 'block';
 
@@ -642,19 +736,38 @@
         }
 
         function createEmployeeConfig() {
-            let configHTML = '<table class="config-table"><tr><th>Empleado</th><th>Entrada L-V</th><th>Salida L-V</th><th>Entrada Tarde</th><th>Entrada Sáb</th><th>Salida Sáb</th><th>Almuerzo (min)</th></tr>';
+            let configHTML = `
+                <table class="config-table">
+                    <tr>
+                        <th>Empleado</th>
+                        <th>Entrada<br>Mañana</th>
+                        <th>Salida<br>Mañana</th>
+                        <th>Entrada<br>Tarde</th>
+                        <th>Salida<br>Tarde</th>
+                        <th>Trabaja<br>Tarde</th>
+                        <th>Sáb<br>Entrada</th>
+                        <th>Sáb<br>Salida</th>
+                        <th>Almuerzo<br>(min)</th>
+                    </tr>
+            `;
             
             processedEmployees.forEach(employee => {
                 const config = getEmployeeConfig(employee.id);
                 configHTML += `
                     <tr>
-                        <td>${employee.name}</td>
-                        <td><input type="time" id="entry_${employee.id}" value="${config.weekdayEntry}" style="width:80px;font-size:10px;"></td>
-                        <td><input type="time" id="exit_${employee.id}" value="${config.weekdayExit}" style="width:80px;font-size:10px;"></td>
-                        <td><input type="time" id="afternoon_${employee.id}" value="${config.afternoonEntry}" style="width:80px;font-size:10px;"></td>
-                        <td><input type="time" id="sat_entry_${employee.id}" value="${config.saturdayEntry}" style="width:80px;font-size:10px;"></td>
-                        <td><input type="time" id="sat_exit_${employee.id}" value="${config.saturdayExit}" style="width:80px;font-size:10px;"></td>
-                        <td><input type="number" id="lunch_${employee.id}" value="${config.lunchDuration}" style="width:60px;font-size:10px;"></td>
+                        <td style="text-align: left;">${employee.name}</td>
+                        <td><input type="time" id="morning_entry_${employee.id}" value="${config.morningEntry}" style="width:70px;font-size:10px;"></td>
+                        <td><input type="time" id="morning_exit_${employee.id}" value="${config.morningExit}" style="width:70px;font-size:10px;"></td>
+                        <td><input type="time" id="afternoon_entry_${employee.id}" value="${config.afternoonEntry}" style="width:70px;font-size:10px;"></td>
+                        <td><input type="time" id="afternoon_exit_${employee.id}" value="${config.afternoonExit}" style="width:70px;font-size:10px;"></td>
+                        <td>
+                            <div class="checkbox-container">
+                                <input type="checkbox" id="works_afternoon_${employee.id}" ${config.worksAfternoon ? 'checked' : ''}>
+                            </div>
+                        </td>
+                        <td><input type="time" id="sat_entry_${employee.id}" value="${config.saturdayEntry}" style="width:70px;font-size:10px;"></td>
+                        <td><input type="time" id="sat_exit_${employee.id}" value="${config.saturdayExit}" style="width:70px;font-size:10px;"></td>
+                        <td><input type="number" id="lunch_${employee.id}" value="${config.lunchDuration}" style="width:50px;font-size:10px;"></td>
                     </tr>
                 `;
             });
@@ -665,12 +778,13 @@
         }
 
         function recalculateWithConfig() {
-            // Actualizar configuraciones
             processedEmployees.forEach(employee => {
                 employeeConfigs[employee.id] = {
-                    weekdayEntry: document.getElementById(`entry_${employee.id}`).value,
-                    weekdayExit: document.getElementById(`exit_${employee.id}`).value,
-                    afternoonEntry: document.getElementById(`afternoon_${employee.id}`).value,
+                    morningEntry: document.getElementById(`morning_entry_${employee.id}`).value,
+                    morningExit: document.getElementById(`morning_exit_${employee.id}`).value,
+                    afternoonEntry: document.getElementById(`afternoon_entry_${employee.id}`).value,
+                    afternoonExit: document.getElementById(`afternoon_exit_${employee.id}`).value,
+                    worksAfternoon: document.getElementById(`works_afternoon_${employee.id}`).checked,
                     saturdayEntry: document.getElementById(`sat_entry_${employee.id}`).value,
                     saturdayExit: document.getElementById(`sat_exit_${employee.id}`).value,
                     lunchDuration: parseInt(document.getElementById(`lunch_${employee.id}`).value),
@@ -678,10 +792,11 @@
                 };
             });
 
-            // Recalcular estadísticas
             processedEmployees.forEach(employee => {
                 employee.days.forEach(day => {
-                    day.stats = calculateDayStats(day.organized, employee.id);
+                    if (!day.isSunday) {
+                        day.stats = calculateDayStats(day.organized, employee.id);
+                    }
                 });
             });
 
@@ -701,7 +816,7 @@
             for (let day = 1; day <= maxDays; day++) {
                 headerHTML += `<th class="day-header">D${day}</th>`;
             }
-            headerHTML += '<th>Total H</th><th>Tardanzas</th><th>H. Extra</th></tr>';
+            headerHTML += '<th>Total H</th><th>Tardanzas</th><th>H. Extra</th><th>Incompletos</th></tr>';
             tableHead.innerHTML = headerHTML;
 
             const tableBody = document.getElementById('tableBody');
@@ -712,6 +827,8 @@
             let totalOvertimeDays = 0;
             let totalDays = 0;
             let totalSaturdays = 0;
+            let totalSundays = 0;
+            let totalIncomplete = 0;
 
             processedEmployees.forEach(employee => {
                 bodyHTML += `<tr><td class="employee-name">${employee.name}<br><small>${employee.department}</small></td>`;
@@ -719,18 +836,24 @@
                 let employeeTotalHours = 0;
                 let employeeTotalLate = 0;
                 let employeeTotalOvertime = 0;
+                let employeeTotalIncomplete = 0;
                 let employeeSaturdays = 0;
+                let employeeSundays = 0;
 
-                for (let dayIndex = 0; dayIndex < maxDays; dayIndex++) {
-                    const dayData = employee.days[dayIndex];
+                employee.days.forEach((dayData, dayIndex) => {
+                    const stats = dayData.stats;
                     
-                    if (dayData) {
-                        const stats = dayData.stats;
+                    if (dayData.isSunday) {
+                        bodyHTML += '<td class="sunday">DOMINGO <span class="sunday-indicator">D</span></td>';
+                        employeeSundays++;
+                        totalSundays++;
+                    } else if (dayData.organized) {
                         const org = dayData.organized;
                         
                         employeeTotalHours += stats.hoursWorked;
                         if (stats.lateMinutes > 0) employeeTotalLate++;
                         if (stats.overtimeMinutes > 0) employeeTotalOvertime++;
+                        if (stats.status === 'incompleto') employeeTotalIncomplete++;
                         if (org.isSaturday) employeeSaturdays++;
                         
                         let statusClass = '';
@@ -761,14 +884,18 @@
                                 statusClass = 'warning';
                                 statusIcon = '🟡';
                                 break;
+                            case 'incompleto':
+                                statusClass = 'incomplete';
+                                statusIcon = '❌';
+                                totalIncomplete++;
+                                break;
                         }
 
                         let cellContent = `
                             <div class="time-cell">
-                                <div><strong>${org.entry}</strong>→<strong>${org.exit}</strong></div>
+                                <div><strong>${org.entry || '--'}</strong>→<strong>${org.exit || '--'}</strong></div>
                         `;
                         
-                        // Mostrar horario de tarde si existe
                         if (org.afternoonEntry && org.afternoonEntry !== org.lunchEnd) {
                             cellContent += `<div><small>Tarde: ${org.afternoonEntry}</small></div>`;
                         }
@@ -777,6 +904,7 @@
                                 <div class="${statusClass}">${minutesToTimeString(stats.hoursWorked)} ${statusIcon}</div>
                                 ${stats.lateMinutes > 0 ? `<div class="late">+${stats.lateMinutes}m</div>` : ''}
                                 ${stats.overtimeMinutes > 0 ? `<div class="overtime">E+${stats.overtimeMinutes}m</div>` : ''}
+                                ${org.isIncomplete ? `<div class="incomplete">Faltan: ${org.missingRecords.join(', ')}</div>` : ''}
                                 ${org.isSaturday ? '<span class="saturday-indicator">S</span>' : ''}
                             </div>
                         `;
@@ -787,7 +915,7 @@
                     } else {
                         bodyHTML += '<td style="background: #f0f0f0;">--</td>';
                     }
-                }
+                });
 
                 totalHours += employeeTotalHours;
                 totalSaturdays += employeeSaturdays;
@@ -795,6 +923,7 @@
                 bodyHTML += `<td class="hours-worked"><strong>${minutesToTimeString(employeeTotalHours)}</strong></td>`;
                 bodyHTML += `<td class="${employeeTotalLate > 0 ? 'late' : 'good'}">${employeeTotalLate}</td>`;
                 bodyHTML += `<td class="${employeeTotalOvertime > 0 ? 'overtime' : 'good'}">${employeeTotalOvertime}</td>`;
+                bodyHTML += `<td class="${employeeTotalIncomplete > 0 ? 'incomplete' : 'good'}">${employeeTotalIncomplete}</td>`;
                 bodyHTML += '</tr>';
             });
 
@@ -807,11 +936,15 @@
                 </div>
                 <div class="summary-card">
                     <div class="summary-value">${totalDays}</div>
-                    <div class="summary-label">Días Procesados</div>
+                    <div class="summary-label">Días Laborales</div>
                 </div>
                 <div class="summary-card" style="background: #fff8e1;">
                     <div class="summary-value" style="color: #ff9800;">${totalSaturdays}</div>
                     <div class="summary-label">Sábados</div>
+                </div>
+                <div class="summary-card" style="background: #e8f5e8;">
+                    <div class="summary-value" style="color: #4caf50;">${totalSundays}</div>
+                    <div class="summary-label">Domingos</div>
                 </div>
                 <div class="summary-card" style="background: #ffebee;">
                     <div class="summary-value" style="color: #dc3545;">${totalLateDays}</div>
@@ -820,6 +953,10 @@
                 <div class="summary-card" style="background: #f3e5f5;">
                     <div class="summary-value" style="color: #6f42c1;">${totalOvertimeDays}</div>
                     <div class="summary-label">Horas Extra</div>
+                </div>
+                <div class="summary-card" style="background: #fce4ec;">
+                    <div class="summary-value" style="color: #e91e63;">${totalIncomplete}</div>
+                    <div class="summary-label">Incompletos</div>
                 </div>
                 <div class="summary-card">
                     <div class="summary-value">${minutesToTimeString(totalHours)}</div>
@@ -842,30 +979,82 @@ ID:		13451767						Nombre:		GERMAN ENRIQUE								Departamento:		Empresa
         function exportToCSV() {
             if (processedEmployees.length === 0) return;
             
-            let csv = 'Empleado,ID,Departamento,Dia,Tipo_Dia,Entrada,Salida,Entrada_Tarde,Horas_Trabajadas,Minutos_Tardanza,Minutos_Extras,Estado,Almuerzo_Inicio,Almuerzo_Fin\n';
+            let csv = 'Empleado,ID,Departamento,Total_Horas,Dias_Tardanza,Dias_Horas_Extra,Dias_Incompletos,Sabados,Domingos\n';
+
+            processedEmployees.forEach(employee => {
+                let totalHours = 0;
+                let lateDays = 0;
+                let overtimeDays = 0;
+                let incompleteDays = 0;
+                let saturdays = 0;
+                let sundays = 0;
+
+                employee.days.forEach(day => {
+                    if (day.isSunday) {
+                        sundays++;
+                    } else if (day.organized) {
+                        totalHours += day.stats.hoursWorked;
+                        if (day.stats.lateMinutes > 0) lateDays++;
+                        if (day.stats.overtimeMinutes > 0) overtimeDays++;
+                        if (day.stats.status === 'incompleto') incompleteDays++;
+                        if (day.organized.isSaturday) saturdays++;
+                    }
+                });
+                
+                csv += `"${employee.name}","${employee.id}","${employee.department}",`;
+                csv += `"${minutesToTimeString(totalHours)}",${lateDays},${overtimeDays},${incompleteDays},${saturdays},${sundays}\n`;
+            });
+
+            downloadCSV(csv, 'resumen_asistencia.csv');
+        }
+
+        function exportDetailedReport() {
+            if (processedEmployees.length === 0) return;
+            
+            let csv = 'ID,Empleado,Departamento,Dia_Numero,Tipo_Dia,Entrada_Mañana,Salida_Mañana,Entrada_Tarde,Salida_Tarde,';
+            csv += 'Horas_Trabajadas,Minutos_Tardanza,Minutos_Horas_Extra,Minutos_Salida_Temprana,Estado,Almuerzo_Inicio,Almuerzo_Fin,Registros_Faltantes,Todos_Los_Registros\n';
 
             processedEmployees.forEach(employee => {
                 employee.days.forEach(day => {
-                    const org = day.organized;
-                    const stats = day.stats;
-                    const dayType = org.isSaturday ? 'Sábado' : 'Laboral';
+                    const dayType = day.isSunday ? 'Domingo' : 
+                                  (day.organized && day.organized.isSaturday ? 'Sábado' : 'Laboral');
                     
-                    csv += `"${employee.name}","${employee.id}","${employee.department}",${day.dayNumber},"${dayType}",`;
-                    csv += `"${org.entry || ''}","${org.exit || ''}","${org.afternoonEntry || ''}",`;
-                    csv += `"${minutesToTimeString(stats.hoursWorked)}",${stats.lateMinutes},${stats.overtimeMinutes},"${stats.status}",`;
-                    csv += `"${org.lunchStart || ''}","${org.lunchEnd || ''}"\n`;
+                    if (day.isSunday) {
+                        csv += `"${employee.id}","${employee.name}","${employee.department}",${day.dayNumber},"${dayType}",`;
+                        csv += '"","","","","","","","","domingo","","","",""' + '\n';
+                    } else {
+                        const org = day.organized;
+                        const stats = day.stats;
+                        const config = getEmployeeConfig(employee.id);
+                        
+                        // Determinar horarios esperados
+                        let expectedMorningEntry = org.isSaturday ? config.saturdayEntry : config.morningEntry;
+                        let expectedMorningExit = org.isSaturday ? config.saturdayExit : config.morningExit;
+                        let expectedAfternoonEntry = config.worksAfternoon && !org.isSaturday ? config.afternoonEntry : '';
+                        let expectedAfternoonExit = config.worksAfternoon && !org.isSaturday ? config.afternoonExit : '';
+                        
+                        csv += `"${employee.id}","${employee.name}","${employee.department}",${day.dayNumber},"${dayType}",`;
+                        csv += `"${org.entry || ''}","${org.exit || ''}","${org.afternoonEntry || expectedAfternoonEntry}","${expectedAfternoonExit}",`;
+                        csv += `"${minutesToTimeString(stats.hoursWorked)}",${stats.lateMinutes},${stats.overtimeMinutes},${stats.earlyExitMinutes},"${stats.status}",`;
+                        csv += `"${org.lunchStart || ''}","${org.lunchEnd || ''}","${org.missingRecords ? org.missingRecords.join('; ') : ''}","${org.allTimes.join(' ')}"` + '\n';
+                    }
                 });
             });
 
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            downloadCSV(csv, 'informe_completo_asistencia.csv');
+        }
+
+        function downloadCSV(csvContent, filename) {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.setAttribute('hidden', '');
             a.setAttribute('href', url);
-            a.setAttribute('download', 'asistencia_completa.csv');
+            a.setAttribute('download', filename);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         }
     </script>
 </body>
