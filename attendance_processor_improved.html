@@ -845,7 +845,7 @@
             for (let day = 1; day <= maxDays; day++) {
                 headerHTML += `<th class="day-header">D${day}</th>`;
             }
-            headerHTML += '<th>Horas Trabajadas</th><th>Horas Esperadas</th><th>Saldo</th><th>Tardanzas</th><th>H. Extra</th><th>Incompletos</th></tr>';
+            headerHTML += '<th>Horas Trabajadas</th><th>Horas Esperadas</th><th>Saldo</th><th>Tardanzas</th><th>H. Extra</th><th>Incompletos</th><th>Salidas Tempranas</th></tr>';
             tableHead.innerHTML = headerHTML;
 
             const tableBody = document.getElementById('tableBody');
@@ -859,6 +859,7 @@
             let totalSundays = 0;
             let totalIncomplete = 0;
             let totalExpected = 0;
+            let employeeEarlyExit = 0;
 
             processedEmployees.forEach(employee => {
                 bodyHTML += `<tr><td class="employee-name">${employee.name}<br><small>${employee.department}</small></td>`;
@@ -936,7 +937,7 @@
                                 ${stats.lateMinutes > 0 ? `<div class="late">+${minutesToTimeString(stats.lateMinutes)}</div>` : ''}
                                 ${stats.overtimeMinutes > 0 ? `<div class="overtime">E+${stats.overtimeMinutes}m</div>` : ''}
                                 ${org.isIncomplete ? `<div class="incomplete">Faltan: ${org.missingRecords.join(', ')}</div>` : ''}
-                                ${org.isSaturday ? '<span class="saturday-indicator">S</span>' : ''}
+                                ${org.isSaturday ? '<span class="saturday-indicator">S</span>' : ''}${stats.earlyExitMinutes > 0 ? `<div class="warning">-${minutesToTimeString(stats.earlyExitMinutes)}</div>` : ''}
                             </div>
                         `;
                         
@@ -964,8 +965,8 @@
                 bodyHTML += `<td class="${employeeTotalLate > 0 ? 'late' : 'good'}">${employeeTotalLate}</td>`;
                 bodyHTML += `<td class="${employeeTotalOvertime > 0 ? 'overtime' : 'good'}">${employeeTotalOvertime}</td>`;
                 bodyHTML += `<td class="${employeeTotalIncomplete > 0 ? 'incomplete' : 'good'}">${employeeTotalIncomplete}</td>`;
+                bodyHTML += `<td class="${employeeEarlyExit > 0 ? 'warning' : 'good'}">${minutesToTimeString(employeeEarlyExit)}</td>`;
                 bodyHTML += '</tr>';
-
             });
 
             tableBody.innerHTML = bodyHTML;
@@ -1040,6 +1041,16 @@ ID:		13451767						Nombre:		GERMAN ENRIQUE								Departamento:		Empresa
                 let incompleteDays = 0;
                 let saturdays = 0;
                 let sundays = 0;
+                let employeeEarlyExit = 0;
+
+                employee.days.forEach(dayData => {
+                    employeeTotalHours += dayData.stats.hoursWorked;
+                    employeeExpectedHours += dayData.stats.expectedMinutes || 0;
+                    employeeEarlyExit += dayData.stats.earlyExitMinutes || 0;
+                    employeeEarlyExit += stats.earlyExitMinutes || 0;
+
+                });
+
 
                 employee.days.forEach(day => {
                     if (day.isSunday) {
@@ -1132,6 +1143,7 @@ ID:		13451767						Nombre:		GERMAN ENRIQUE								Departamento:		Empresa
                         stats ? stats.hoursWorked/60 + " h" : "0",
                         stats ? minutesToTimeString(stats.lateMinutes) : "0:00",
                         stats ? stats.overtimeMinutes + " min" : "0",
+                        stats ? minutesToTimeString(stats.earlyExitMinutes) : "0:00",
                         stats ? stats.status : "--"
                     ];
                 });
