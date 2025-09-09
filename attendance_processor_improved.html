@@ -323,8 +323,14 @@
                 <button class="btn" onclick="exportToCSV()">📥 Descargar Resumen CSV</button>
                 <button class="btn" onclick="exportDetailedReport()">📋 Descargar Informe Completo</button>
             </div>
+
+            <button class="btn" onclick="exportToPDF()">📄 Descargar PDF</button>
+
         </div>
     </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 
     <script>
         let processedEmployees = [];
@@ -553,6 +559,7 @@
                     lateMinutes: 0,
                     earlyExitMinutes: 0,
                     overtimeMinutes: 0,
+                    expectedMinutes: 0,
                     status: 'domingo'
                 };
             }
@@ -563,28 +570,25 @@
                     lateMinutes: 0,
                     earlyExitMinutes: 0,
                     overtimeMinutes: 0,
+                    expectedMinutes: 0,
                     status: 'incompleto'
                 };
             }
 
             const config = getEmployeeConfig(employeeId);
             const tolerance = parseInt(document.getElementById('tolerance').value);
-            
+
             let expectedEntry, expectedExit;
-            
+
             if (dayData.isSaturday) {
                 expectedEntry = config.saturdayEntry;
                 expectedExit = config.saturdayExit;
             } else {
                 expectedEntry = config.morningEntry;
-                if (config.worksAfternoon) {
-                    expectedExit = config.afternoonExit;
-                } else {
-                    expectedExit = config.morningExit;
-                }
+                expectedExit = config.worksAfternoon ? config.afternoonExit : config.morningExit;
             }
 
-            const lunchDuration = dayData.isSaturday ? config.saturdayLunch : 
+            const lunchDuration = dayData.isSaturday ? config.saturdayLunch :
                                 (config.worksAfternoon ? config.lunchDuration : 0);
 
             const entryMin = timeToMinutes(dayData.entry);
@@ -595,7 +599,7 @@
             // Tardanza mañana
             let lateMorning = Math.max(0, entryMin - expectedEntryMin - tolerance);
 
-            // Tardanza tarde (si aplica)
+            // Tardanza tarde
             let lateAfternoon = 0;
             if (dayData.afternoonEntry && config.worksAfternoon && !dayData.isSaturday) {
                 const expectedAfternoonMin = timeToMinutes(config.afternoonEntry);
@@ -603,14 +607,12 @@
                 lateAfternoon = Math.max(0, afternoonEntryMin - expectedAfternoonMin - tolerance);
             }
 
-            // Tardanza total = mañana + tarde
             const lateMinutes = lateMorning + lateAfternoon;
 
             const earlyExitMinutes = Math.max(0, expectedExitMin - exitMin - tolerance);
             const overtimeMinutes = Math.max(0, exitMin - expectedExitMin - tolerance);
 
             let totalMinutes = exitMin - entryMin;
-            
             if (dayData.lunchStart && dayData.lunchEnd) {
                 const actualLunch = timeToMinutes(dayData.lunchEnd) - timeToMinutes(dayData.lunchStart);
                 totalMinutes -= actualLunch;
@@ -619,6 +621,19 @@
             }
 
             const hoursWorked = Math.max(0, totalMinutes);
+
+            // 🔹 Horas esperadas según la configuración
+            let expectedMinutes = 0;
+            if (dayData.isSaturday) {
+                expectedMinutes = timeToMinutes(config.saturdayExit) - timeToMinutes(config.saturdayEntry);
+            } else {
+                if (config.worksAfternoon) {
+                    expectedMinutes = (timeToMinutes(config.morningExit) - timeToMinutes(config.morningEntry)) +
+                                    (timeToMinutes(config.afternoonExit) - timeToMinutes(config.afternoonEntry));
+                } else {
+                    expectedMinutes = timeToMinutes(config.morningExit) - timeToMinutes(config.morningEntry);
+                }
+            }
 
             let status = 'puntual';
             if (dayData.isIncomplete) {
@@ -636,11 +651,12 @@
             }
 
             return {
-                hoursWorked: hoursWorked,
-                lateMinutes: lateMinutes,
-                earlyExitMinutes: earlyExitMinutes,
-                overtimeMinutes: overtimeMinutes,
-                status: status
+                hoursWorked,
+                lateMinutes,
+                earlyExitMinutes,
+                overtimeMinutes,
+                expectedMinutes,
+                status
             };
         }
 
@@ -829,7 +845,7 @@
             for (let day = 1; day <= maxDays; day++) {
                 headerHTML += `<th class="day-header">D${day}</th>`;
             }
-            headerHTML += '<th>Total H</th><th>Tardanzas</th><th>H. Extra</th><th>Incompletos</th></tr>';
+            headerHTML += '<th>Horas Trabajadas</th><th>Horas Esperadas</th><th>Saldo</th><th>Tardanzas</th><th>H. Extra</th><th>Incompletos</th></tr>';
             tableHead.innerHTML = headerHTML;
 
             const tableBody = document.getElementById('tableBody');
@@ -842,6 +858,7 @@
             let totalSaturdays = 0;
             let totalSundays = 0;
             let totalIncomplete = 0;
+            let totalExpected = 0;
 
             processedEmployees.forEach(employee => {
                 bodyHTML += `<tr><td class="employee-name">${employee.name}<br><small>${employee.department}</small></td>`;
@@ -852,6 +869,7 @@
                 let employeeTotalIncomplete = 0;
                 let employeeSaturdays = 0;
                 let employeeSundays = 0;
+                let employeeExpectedHours = 0;
 
                 employee.days.forEach((dayData, dayIndex) => {
                     const stats = dayData.stats;
@@ -915,7 +933,7 @@
                         
                         cellContent += `
                                 <div class="${statusClass}">${minutesToTimeString(stats.hoursWorked)} ${statusIcon}</div>
-                                ${stats.lateMinutes > 0 ? `<div class="late">+${stats.lateMinutes}m</div>` : ''}
+                                ${stats.lateMinutes > 0 ? `<div class="late">+${minutesToTimeString(stats.lateMinutes)}</div>` : ''}
                                 ${stats.overtimeMinutes > 0 ? `<div class="overtime">E+${stats.overtimeMinutes}m</div>` : ''}
                                 ${org.isIncomplete ? `<div class="incomplete">Faltan: ${org.missingRecords.join(', ')}</div>` : ''}
                                 ${org.isSaturday ? '<span class="saturday-indicator">S</span>' : ''}
@@ -928,16 +946,26 @@
                     } else {
                         bodyHTML += '<td style="background: #f0f0f0;">--</td>';
                     }
+
+                        employeeTotalHours += dayData.stats.hoursWorked;
+                        employeeExpectedHours += dayData.stats.expectedMinutes || 0;
                 });
+
+                let saldo = employeeTotalHours - employeeExpectedHours;
 
                 totalHours += employeeTotalHours;
                 totalSaturdays += employeeSaturdays;
+                totalHours += employeeTotalHours;
+                totalExpected += employeeExpectedHours;  // 👈 ahora sí lo acumulas
                 
                 bodyHTML += `<td class="hours-worked"><strong>${minutesToTimeString(employeeTotalHours)}</strong></td>`;
+                bodyHTML += `<td class="hours-expected"><strong>${minutesToTimeString(employeeExpectedHours)}</strong></td>`;
+                bodyHTML += `<td class="${saldo >= 0 ? 'good' : 'late'}"><strong>${saldo >= 0 ? '+' : ''}${minutesToTimeString(saldo)}</strong></td>`;
                 bodyHTML += `<td class="${employeeTotalLate > 0 ? 'late' : 'good'}">${employeeTotalLate}</td>`;
                 bodyHTML += `<td class="${employeeTotalOvertime > 0 ? 'overtime' : 'good'}">${employeeTotalOvertime}</td>`;
                 bodyHTML += `<td class="${employeeTotalIncomplete > 0 ? 'incomplete' : 'good'}">${employeeTotalIncomplete}</td>`;
                 bodyHTML += '</tr>';
+
             });
 
             tableBody.innerHTML = bodyHTML;
@@ -975,6 +1003,17 @@
                     <div class="summary-value">${minutesToTimeString(totalHours)}</div>
                     <div class="summary-label">Total Horas</div>
                 </div>
+                <div class="summary-card">
+                    <div class="summary-value">${minutesToTimeString(totalExpected)}</div>
+                    <div class="summary-label">Horas Esperadas</div>
+                </div>
+                <div class="summary-card" style="background: #e8f5e9;">
+                <div class="summary-value" style="color: ${totalHours - totalExpected >= 0 ? '#28a745' : '#dc3545'}">
+                    ${totalHours - totalExpected >= 0 ? '+' : ''}${minutesToTimeString(totalHours - totalExpected)}
+                </div>
+                <div class="summary-label">Saldo de Horas</div>
+                </div>
+
             `;
 
             document.getElementById('resultsSection').style.display = 'block';
@@ -1048,7 +1087,7 @@ ID:		13451767						Nombre:		GERMAN ENRIQUE								Departamento:		Empresa
                         
                         csv += `"${employee.id}","${employee.name}","${employee.department}",${day.dayNumber},"${dayType}",`;
                         csv += `"${org.entry || ''}","${org.exit || ''}","${org.afternoonEntry || expectedAfternoonEntry}","${expectedAfternoonExit}",`;
-                        csv += `"${minutesToTimeString(stats.hoursWorked)}",${stats.lateMinutes},${stats.overtimeMinutes},${stats.earlyExitMinutes},"${stats.status}",`;
+                        csv += `"${minutesToTimeString(stats.hoursWorked)}","${minutesToTimeString(stats.lateMinutes)}","${minutesToTimeString(stats.overtimeMinutes)}","${minutesToTimeString(stats.earlyExitMinutes)}","${stats.status}",`;
                         csv += `"${org.lunchStart || ''}","${org.lunchEnd || ''}","${org.missingRecords ? org.missingRecords.join('; ') : ''}","${org.allTimes.join(' ')}"` + '\n';
                     }
                 });
@@ -1069,6 +1108,49 @@ ID:		13451767						Nombre:		GERMAN ENRIQUE								Departamento:		Empresa
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         }
+
+        async function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF("landscape");
+
+            doc.setFontSize(18);
+            doc.text("📊 Informe de Asistencia", 14, 20);
+
+            processedEmployees.forEach((employee, idx) => {
+                const rows = employee.days.map(day => {
+                    const org = day.organized || {};
+                    const stats = day.stats;
+
+                    return [
+                        day.dayNumber,
+                        day.isSunday ? "Domingo" : (org.isSaturday ? "Sábado" : "Laboral"),
+                        org.entry || "--",
+                        org.lunchStart || "--",
+                        org.lunchEnd || "--",
+                        org.afternoonEntry || "--",
+                        org.exit || "--",
+                        stats ? stats.hoursWorked/60 + " h" : "0",
+                        stats ? minutesToTimeString(stats.lateMinutes) : "0:00",
+                        stats ? stats.overtimeMinutes + " min" : "0",
+                        stats ? stats.status : "--"
+                    ];
+                });
+
+                doc.autoTable({
+                    startY: idx === 0 ? 30 : doc.lastAutoTable.finalY + 10,
+                    head: [["Día", "Tipo", "Entrada", "Almuerzo Inicio", "Almuerzo Fin", "Entrada Tarde", "Salida", "Horas", "Tardanzas", "Extras", "Estado"]],
+                    body: rows,
+                    theme: "striped",
+                    headStyles: { fillColor: [102, 126, 234] },
+                    styles: { fontSize: 8 }
+                });
+
+                doc.text(`${employee.name} (${employee.department})`, 14, doc.lastAutoTable.finalY + 6);
+            });
+
+            doc.save("informe_asistencia.pdf");
+        }
+
     </script>
 </body>
 </html>
